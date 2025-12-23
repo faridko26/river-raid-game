@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>River Raid</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0d0d0d;
+            --surface: #1a1a1a;
+            --river: #141414;
+            --bank: #252525;
+            --accent: #e8a838;
+            --accent-dim: #9c7028;
+            --text: #f5f5f5;
+            --text-dim: #666;
+            --danger: #d94f4f;
+            --fuel: #5cb85c;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: var(--bg);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-family: 'Space Mono', monospace;
+            color: var(--text);
+        }
+
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 600px;
+            padding: 16px 24px;
+            background: var(--surface);
+            border-radius: 4px;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            letter-spacing: 2px;
+            color: var(--text-dim);
+            text-transform: uppercase;
+        }
+
+        .stat-value {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 28px;
+            color: var(--text);
+            letter-spacing: 1px;
+        }
+
+        .fuel-container {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .fuel-bar-outer {
+            width: 140px;
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .fuel-bar-inner {
+            height: 100%;
+            background: var(--fuel);
+            transition: width 0.3s ease, background 0.3s ease;
+            border-radius: 4px;
+        }
+
+        .fuel-bar-inner.warning {
+            background: var(--danger);
+            animation: pulse 0.5s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        #gameCanvas {
+            background: var(--river);
+            border-radius: 4px;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            padding: 12px 24px;
+            background: var(--surface);
+            border-radius: 4px;
+            font-size: 11px;
+            color: var(--text-dim);
+        }
+
+        .control-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .key {
+            padding: 4px 8px;
+            background: var(--bg);
+            border-radius: 3px;
+            font-size: 10px;
+            color: var(--accent);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 13, 13, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 32px;
+            z-index: 100;
+        }
+
+        .overlay.hidden {
+            display: none;
+        }
+
+        .overlay h1 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 72px;
+            color: var(--accent);
+            letter-spacing: 8px;
+        }
+
+        .overlay h2 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 48px;
+            color: var(--danger);
+            letter-spacing: 4px;
+        }
+
+        .instructions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 13px;
+            color: var(--text-dim);
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .final-score {
+            text-align: center;
+        }
+
+        .final-score span {
+            display: block;
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 64px;
+            color: var(--accent);
+            margin-top: 8px;
+        }
+
+        .btn {
+            padding: 14px 48px;
+            font-family: 'Space Mono', monospace;
+            font-size: 12px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--bg);
+            background: var(--accent);
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn:hover {
+            background: var(--text);
+            transform: translateY(-2px);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .credit {
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+            text-align: center;
+            padding: 8px 0;
+        }
+
+        .overlay-credit {
+            position: absolute;
+            bottom: 30px;
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="header">
+            <div class="stat">
+                <span class="stat-label">Score</span>
+                <span class="stat-value" id="score">0</span>
+            </div>
+            <div class="fuel-container">
+                <span class="stat-label">Fuel</span>
+                <div class="fuel-bar-outer">
+                    <div class="fuel-bar-inner" id="fuelBar"></div>
+                </div>
+            </div>
+            <div class="stat">
+                <span class="stat-label">Lives</span>
+                <span class="stat-value" id="lives">3</span>
+            </div>
+        </div>
+
+        <canvas id="gameCanvas" width="600" height="700"></canvas>
+
+        <div class="controls">
+            <div class="control-item">
+                <span class="key">←</span><span class="key">→</span>
+                <span>Move</span>
+            </div>
+            <div class="control-item">
+                <span class="key">↑</span><span class="key">↓</span>
+                <span>Speed</span>
+            </div>
+            <div class="control-item">
+                <span class="key">Space</span>
+                <span>Fire</span>
+            </div>
+            <div class="control-item">
+                <span class="key">P</span>
+                <span>Pause</span>
+            </div>
+        </div>
+
+        <div class="credit">Designed by Farid</div>
+    </div>
+
+    <!-- Start Screen -->
+    <div class="overlay" id="startScreen">
+        <h1>RIVER RAID</h1>
+        <div class="instructions">
+            <span>Navigate through the river canyon</span>
+            <span>Destroy enemies • Collect fuel • Survive</span>
+        </div>
+        <button class="btn" id="startBtn">Start Game</button>
+        <div class="overlay-credit">Design by Farid</div>
+    </div>
+
+    <!-- Game Over Screen -->
+    <div class="overlay hidden" id="gameOverScreen">
+        <h2>GAME OVER</h2>
+        <div class="final-score">
+            Final Score
+            <span id="finalScore">0</span>
+        </div>
+        <button class="btn" id="restartBtn">Play Again</button>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Colors
+        const COLORS = {
+            river: '#141414',
+            bank: '#252525',
+            bankEdge: '#333',
+            player: '#e8a838',
+            playerDark: '#9c7028',
+            bullet: '#e8a838',
+            enemy: '#d94f4f',
+            enemyDark: '#8b3333',
+            helicopter: '#7a7a7a',
+            helicopterDark: '#4a4a4a',
+            bridge: '#3d3d3d',
+            bridgeDark: '#2a2a2a',
+            fuel: '#5cb85c',
+            fuelDark: '#3d7a3d',
+            explosion: '#e8a838',
+            water: '#1a1a1a'
+        };
+
+        // Game state
+        let gameRunning = false;
+        let gamePaused = false;
+        let score = 0;
+        let lives = 3;
+        let fuel = 100;
+        let scrollSpeed = 3;
+        let baseScrollSpeed = 3;
+
+        // Player
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 100,
+            width: 36,
+            height: 44,
+            speed: 5
+        };
+
+        // Game objects
+        let bullets = [];
+        let enemies = [];
+        let fuelDepots = [];
+        let explosions = [];
+        let riverSegments = [];
+
+        // Input
+        const keys = { left: false, right: false, up: false, down: false, space: false };
+        let lastShot = 0;
+        const shootCooldown = 150;
+
+        // River generation
+        function generateRiverSegment(y) {
+            const minWidth = 200;
+            const maxWidth = 380;
+            const lastSegment = riverSegments[riverSegments.length - 1];
+            
+            let centerX, width;
+            
+            if (lastSegment) {
+                const maxShift = 25;
+                centerX = lastSegment.centerX + (Math.random() - 0.5) * maxShift;
+                centerX = Math.max(minWidth / 2 + 50, Math.min(canvas.width - minWidth / 2 - 50, centerX));
+                const widthChange = (Math.random() - 0.5) * 30;
+                width = Math.max(minWidth, Math.min(maxWidth, lastSegment.width + widthChange));
+            } else {
+                centerX = canvas.width / 2;
+                width = 320;
+            }
+
+            return {
+                y: y,
+                centerX: centerX,
+                width: width,
+                leftBank: centerX - width / 2,
+                rightBank: centerX + width / 2
+            };
+        }
+
+        function initRiver() {
+            riverSegments = [];
+            for (let y = canvas.height + 50; y >= -50; y -= 20) {
+                riverSegments.push(generateRiverSegment(y));
+            }
+        }
+
+        // Spawn functions
+        function spawnEnemy() {
+            const segment = riverSegments.find(s => s.y < 0) || riverSegments[0];
+            const types = ['ship', 'helicopter', 'bridge'];
+            const type = types[Math.floor(Math.random() * types.length)];
+            
+            let x, width, height, speed, points;
+            
+            if (type === 'ship') {
+                width = 30;
+                height = 38;
+                x = segment.leftBank + 25 + Math.random() * (segment.width - 50);
+                speed = Math.random() * 1.5 - 0.75;
+                points = 30;
+            } else if (type === 'helicopter') {
+                width = 36;
+                height = 30;
+                x = segment.leftBank + 25 + Math.random() * (segment.width - 50);
+                speed = Math.random() * 2.5 - 1.25;
+                points = 60;
+            } else {
+                width = segment.width + 30;
+                height = 20;
+                x = segment.centerX;
+                speed = 0;
+                points = 100;
+            }
+
+            enemies.push({ type, x, y: -50, width, height, speed, points, segment });
+        }
+
+        function spawnFuelDepot() {
+            const segment = riverSegments.find(s => s.y < 0) || riverSegments[0];
+            fuelDepots.push({
+                x: segment.leftBank + 35 + Math.random() * (segment.width - 70),
+                y: -40,
+                width: 26,
+                height: 36
+            });
+        }
+
+        // Drawing
+        function drawRiver() {
+            // Background
+            ctx.fillStyle = COLORS.river;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Banks
+            ctx.fillStyle = COLORS.bank;
+            
+            // Left bank
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            for (let i = riverSegments.length - 1; i >= 0; i--) {
+                ctx.lineTo(riverSegments[i].leftBank, riverSegments[i].y);
+            }
+            ctx.lineTo(0, riverSegments[0].y);
+            ctx.closePath();
+            ctx.fill();
+
+            // Right bank
+            ctx.beginPath();
+            ctx.moveTo(canvas.width, 0);
+            for (let i = riverSegments.length - 1; i >= 0; i--) {
+                ctx.lineTo(riverSegments[i].rightBank, riverSegments[i].y);
+            }
+            ctx.lineTo(canvas.width, riverSegments[0].y);
+            ctx.closePath();
+            ctx.fill();
+
+            // Bank edges
+            ctx.strokeStyle = COLORS.bankEdge;
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            for (let i = riverSegments.length - 1; i >= 0; i--) {
+                if (i === riverSegments.length - 1) ctx.moveTo(riverSegments[i].leftBank, riverSegments[i].y);
+                else ctx.lineTo(riverSegments[i].leftBank, riverSegments[i].y);
+            }
+            ctx.stroke();
+
+            ctx.beginPath();
+            for (let i = riverSegments.length - 1; i >= 0; i--) {
+                if (i === riverSegments.length - 1) ctx.moveTo(riverSegments[i].rightBank, riverSegments[i].y);
+                else ctx.lineTo(riverSegments[i].rightBank, riverSegments[i].y);
+            }
+            ctx.stroke();
+        }
+
+        function drawPlayer() {
+            ctx.save();
+            ctx.translate(player.x, player.y);
+
+            // Body
+            ctx.fillStyle = COLORS.player;
+            ctx.beginPath();
+            ctx.moveTo(0, -player.height / 2);
+            ctx.lineTo(-player.width / 4, player.height / 4);
+            ctx.lineTo(-player.width / 6, player.height / 2);
+            ctx.lineTo(player.width / 6, player.height / 2);
+            ctx.lineTo(player.width / 4, player.height / 4);
+            ctx.closePath();
+            ctx.fill();
+
+            // Wings
+            ctx.fillStyle = COLORS.playerDark;
+            ctx.beginPath();
+            ctx.moveTo(-player.width / 4, 0);
+            ctx.lineTo(-player.width / 2, player.height / 4);
+            ctx.lineTo(-player.width / 4, player.height / 6);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(player.width / 4, 0);
+            ctx.lineTo(player.width / 2, player.height / 4);
+            ctx.lineTo(player.width / 4, player.height / 6);
+            ctx.closePath();
+            ctx.fill();
+
+            // Cockpit
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.ellipse(0, -player.height / 6, 4, 6, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Engine
+            if (keys.up || Math.random() > 0.4) {
+                const flameLen = keys.up ? 20 : 12;
+                ctx.fillStyle = COLORS.player;
+                ctx.globalAlpha = 0.8;
+                ctx.beginPath();
+                ctx.moveTo(-4, player.height / 2);
+                ctx.lineTo(0, player.height / 2 + flameLen + Math.random() * 4);
+                ctx.lineTo(4, player.height / 2);
+                ctx.closePath();
+                ctx.fill();
+                ctx.globalAlpha = 1;
+            }
+
+            ctx.restore();
+        }
+
+        function drawBullets() {
+            ctx.fillStyle = COLORS.bullet;
+            bullets.forEach(b => {
+                ctx.fillRect(b.x - 2, b.y - 10, 4, 12);
+            });
+        }
+
+        function drawEnemies() {
+            enemies.forEach(e => {
+                ctx.save();
+                ctx.translate(e.x, e.y);
+
+                if (e.type === 'ship') {
+                    ctx.fillStyle = COLORS.enemy;
+                    ctx.beginPath();
+                    ctx.moveTo(0, -e.height / 2);
+                    ctx.lineTo(-e.width / 2, e.height / 3);
+                    ctx.lineTo(-e.width / 3, e.height / 2);
+                    ctx.lineTo(e.width / 3, e.height / 2);
+                    ctx.lineTo(e.width / 2, e.height / 3);
+                    ctx.closePath();
+                    ctx.fill();
+                    
+                    ctx.fillStyle = COLORS.enemyDark;
+                    ctx.fillRect(-4, -e.height / 4, 8, e.height / 3);
+                    
+                } else if (e.type === 'helicopter') {
+                    ctx.fillStyle = COLORS.helicopter;
+                    ctx.beginPath();
+                    ctx.ellipse(0, 0, e.width / 3, e.height / 3, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    ctx.fillStyle = COLORS.helicopterDark;
+                    ctx.fillRect(e.width / 4, -2, e.width / 3, 4);
+                    
+                    ctx.strokeStyle = COLORS.helicopter;
+                    ctx.lineWidth = 2;
+                    const rot = (Date.now() % 150) / 150 * Math.PI;
+                    ctx.beginPath();
+                    ctx.moveTo(-e.width / 2 * Math.cos(rot), -e.height / 2);
+                    ctx.lineTo(e.width / 2 * Math.cos(rot), -e.height / 2);
+                    ctx.stroke();
+                    
+                } else if (e.type === 'bridge') {
+                    ctx.fillStyle = COLORS.bridge;
+                    ctx.fillRect(-e.width / 2, -e.height / 2, e.width, e.height);
+                    
+                    ctx.fillStyle = COLORS.bridgeDark;
+                    for (let i = -e.width / 2 + 15; i < e.width / 2; i += 30) {
+                        ctx.fillRect(i, -e.height / 2 - 3, 6, e.height + 6);
+                    }
+                }
+
+                ctx.restore();
+            });
+        }
+
+        function drawFuelDepots() {
+            fuelDepots.forEach(d => {
+                ctx.save();
+                ctx.translate(d.x, d.y);
+
+                ctx.fillStyle = COLORS.fuel;
+                ctx.beginPath();
+                ctx.roundRect(-d.width / 2, -d.height / 2, d.width, d.height, 4);
+                ctx.fill();
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 14px Space Mono';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('F', 0, 0);
+
+                ctx.restore();
+            });
+        }
+
+        function drawExplosions() {
+            explosions.forEach((exp, i) => {
+                const progress = exp.frame / exp.maxFrames;
+                const radius = exp.radius * (0.5 + progress);
+                const alpha = 1 - progress;
+
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                
+                ctx.fillStyle = COLORS.explosion;
+                ctx.beginPath();
+                ctx.arc(exp.x, exp.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Particles
+                for (let j = 0; j < 6; j++) {
+                    const angle = (j / 6) * Math.PI * 2 + exp.frame * 0.15;
+                    const dist = radius * 0.7;
+                    ctx.fillStyle = '#fff';
+                    ctx.beginPath();
+                    ctx.arc(exp.x + Math.cos(angle) * dist, exp.y + Math.sin(angle) * dist, 2 * (1 - progress), 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                ctx.restore();
+
+                exp.frame++;
+                if (exp.frame >= exp.maxFrames) explosions.splice(i, 1);
+            });
+        }
+
+        // Game logic
+        function update() {
+            if (!gameRunning || gamePaused) return;
+
+            // Player movement
+            if (keys.left) player.x -= player.speed;
+            if (keys.right) player.x += player.speed;
+            scrollSpeed = keys.up ? baseScrollSpeed * 2 : keys.down ? baseScrollSpeed * 0.5 : baseScrollSpeed;
+
+            // Get current segment
+            const currentSeg = riverSegments.find(s => s.y >= player.y && s.y < player.y + 20) || riverSegments[Math.floor(riverSegments.length / 2)];
+            
+            // Clamp to river
+            player.x = Math.max(currentSeg.leftBank + player.width / 2 + 5, Math.min(currentSeg.rightBank - player.width / 2 - 5, player.x));
+
+            // Bank collision
+            if (player.x - player.width / 2 <= currentSeg.leftBank || player.x + player.width / 2 >= currentSeg.rightBank) {
+                playerDeath();
+                return;
+            }
+
+            // Shooting
+            if (keys.space && Date.now() - lastShot > shootCooldown) {
+                bullets.push({ x: player.x, y: player.y - player.height / 2, speed: 12 });
+                lastShot = Date.now();
+            }
+
+            // Update bullets
+            bullets.forEach((b, i) => {
+                b.y -= b.speed;
+                if (b.y < -20) bullets.splice(i, 1);
+            });
+
+            // Update river
+            riverSegments.forEach(s => s.y += scrollSpeed);
+            while (riverSegments[0].y > canvas.height + 50) riverSegments.shift();
+            while (riverSegments[riverSegments.length - 1].y > -30) {
+                const lastY = riverSegments[riverSegments.length - 1].y;
+                riverSegments.push(generateRiverSegment(lastY - 20));
+            }
+
+            // Update enemies
+            enemies.forEach((e, i) => {
+                e.y += scrollSpeed;
+                if (e.type !== 'bridge') {
+                    e.x += e.speed;
+                    const seg = riverSegments.find(s => Math.abs(s.y - e.y) < 20) || currentSeg;
+                    if (e.x - e.width / 2 < seg.leftBank + 10 || e.x + e.width / 2 > seg.rightBank - 10) {
+                        e.speed = -e.speed;
+                    }
+                }
+
+                if (e.y > canvas.height + 50) {
+                    enemies.splice(i, 1);
+                    return;
+                }
+
+                // Bullet collision
+                bullets.forEach((b, bi) => {
+                    if (b.x > e.x - e.width / 2 && b.x < e.x + e.width / 2 &&
+                        b.y > e.y - e.height / 2 && b.y < e.y + e.height / 2) {
+                        explosions.push({ x: e.x, y: e.y, radius: 25, frame: 0, maxFrames: 18 });
+                        score += e.points;
+                        updateUI();
+                        enemies.splice(i, 1);
+                        bullets.splice(bi, 1);
+                    }
+                });
+
+                // Player collision
+                if (Math.abs(player.x - e.x) < (player.width + e.width) / 2 - 8 &&
+                    Math.abs(player.y - e.y) < (player.height + e.height) / 2 - 8) {
+                    playerDeath();
+                }
+            });
+
+            // Update fuel depots
+            fuelDepots.forEach((d, i) => {
+                d.y += scrollSpeed;
+                if (d.y > canvas.height + 50) {
+                    fuelDepots.splice(i, 1);
+                    return;
+                }
+
+                if (Math.abs(player.x - d.x) < (player.width + d.width) / 2 &&
+                    Math.abs(player.y - d.y) < (player.height + d.height) / 2) {
+                    fuel = Math.min(100, fuel + 30);
+                    score += 80;
+                    updateUI();
+                    fuelDepots.splice(i, 1);
+                }
+            });
+
+            // Fuel consumption
+            fuel -= 0.05 * scrollSpeed;
+            if (fuel <= 0) {
+                fuel = 0;
+                playerDeath();
+            }
+            updateUI();
+
+            // Spawning
+            if (Math.random() < 0.018) spawnEnemy();
+            if (Math.random() < 0.007) spawnFuelDepot();
+
+            // Difficulty
+            if (score > 0 && score % 500 === 0) {
+                baseScrollSpeed = Math.min(6, baseScrollSpeed + 0.1);
+            }
+        }
+
+        function playerDeath() {
+            explosions.push({ x: player.x, y: player.y, radius: 40, frame: 0, maxFrames: 25 });
+            lives--;
+            updateUI();
+
+            if (lives <= 0) {
+                gameOver();
+            } else {
+                player.x = canvas.width / 2;
+                player.y = canvas.height - 100;
+                fuel = 100;
+                enemies = enemies.filter(e => e.y < canvas.height / 2);
+            }
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('gameOverScreen').classList.remove('hidden');
+        }
+
+        function updateUI() {
+            document.getElementById('score').textContent = score;
+            document.getElementById('lives').textContent = lives;
+            const fuelBar = document.getElementById('fuelBar');
+            fuelBar.style.width = fuel + '%';
+            fuelBar.classList.toggle('warning', fuel < 25);
+        }
+
+        function draw() {
+            drawRiver();
+            drawFuelDepots();
+            drawEnemies();
+            drawBullets();
+            drawPlayer();
+            drawExplosions();
+
+            if (gamePaused) {
+                ctx.fillStyle = 'rgba(13, 13, 13, 0.85)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = COLORS.accent;
+                ctx.font = '48px Bebas Neue';
+                ctx.textAlign = 'center';
+                ctx.fillText('PAUSED', canvas.width / 2, canvas.height / 2);
+            }
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function startGame() {
+            score = 0;
+            lives = 3;
+            fuel = 100;
+            baseScrollSpeed = 3;
+            scrollSpeed = 3;
+            player.x = canvas.width / 2;
+            player.y = canvas.height - 100;
+            bullets = [];
+            enemies = [];
+            fuelDepots = [];
+            explosions = [];
+            initRiver();
+            updateUI();
+            document.getElementById('startScreen').classList.add('hidden');
+            document.getElementById('gameOverScreen').classList.add('hidden');
+            gameRunning = true;
+            gamePaused = false;
+        }
+
+        // Events
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'ArrowLeft') keys.left = true;
+            if (e.code === 'ArrowRight') keys.right = true;
+            if (e.code === 'ArrowUp') keys.up = true;
+            if (e.code === 'ArrowDown') keys.down = true;
+            if (e.code === 'Space') { e.preventDefault(); keys.space = true; }
+            if (e.code === 'KeyP' && gameRunning) gamePaused = !gamePaused;
+        });
+
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'ArrowLeft') keys.left = false;
+            if (e.code === 'ArrowRight') keys.right = false;
+            if (e.code === 'ArrowUp') keys.up = false;
+            if (e.code === 'ArrowDown') keys.down = false;
+            if (e.code === 'Space') keys.space = false;
+        });
+
+        document.getElementById('startBtn').addEventListener('click', startGame);
+        document.getElementById('restartBtn').addEventListener('click', startGame);
+
+        // Init
+        initRiver();
+        gameLoop();
+    </script>
+</body>
+</html>
